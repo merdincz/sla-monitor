@@ -1,0 +1,33 @@
+version: 2
+project_name: sla-monitor
+
+builds:
+  - binary: sla-monitor
+    main: ./cmd/sla-monitor/main.go
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}_{{ .Version }}{{ .Extra }}.tar.gz"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: merdincz
+    name: sla-monitor
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"

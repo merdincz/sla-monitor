@@ -1,0 +1,8 @@
+target: "https://postman-echo.com/get"
+concurrency: 10
+interval: "1s"
+sla_metrics:
+  - uptime
+  - latency
+  - error_rate
+latency_percentiles: [50, 95, 99]
