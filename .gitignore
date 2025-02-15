@@ -1,1 +1,3 @@
 dist/*
+.semrel/*
+semantic-release
