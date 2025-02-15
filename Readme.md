@@ -11,6 +11,3 @@ SLA Monitor is a CLI tool written in Go for monitoring Service Level Agreements 
 
 ## Getting Started
 
-1. **Build the project:**
-   ```bash
-   make build

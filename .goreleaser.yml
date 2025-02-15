@@ -13,10 +13,9 @@ builds:
       - arm64
 
 archives:
-  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}_{{ .Version }}{{ .Extra }}.tar.gz"
+  - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}_{{ .Version }}.tar.gz"
     files:
       - LICENSE
-      - README.md
 
 checksum:
   name_template: "checksums.txt"
