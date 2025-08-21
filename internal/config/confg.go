@@ -16,13 +16,16 @@ type Config struct {
 
 // Use config file if it exists, otherwise use CLI flags/env variables.
 func LoadConfig(cfgFile string) (*Config, error) {
-	viper.SetConfigFile(cfgFile)
+	// Bind environment variables
 	viper.AutomaticEnv()
 
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-		} else {
-			return nil, err
+	// Only attempt to read the config file if a path was supplied.
+	if cfgFile != "" {
+		viper.SetConfigFile(cfgFile)
+		if err := viper.ReadInConfig(); err != nil {
+			if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+				return nil, err
+			}
 		}
 	}
 
