@@ -5,12 +5,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"sla-monitor/internal/config"
 	"sla-monitor/internal/monitor"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -29,17 +29,33 @@ func main() {
 		Example: `sla-monitor --target http://localhost:8080 --concurrency 10 --interval 5s --sla_metrics uptime,latency,error_rate --latency_percentiles 50,95,99`,
 		Run: func(cmd *cobra.Command, args []string) {
 
-			viper.BindPFlag("target", cmd.PersistentFlags().Lookup("target"))
-			viper.BindPFlag("concurrency", cmd.PersistentFlags().Lookup("concurrency"))
-			viper.BindPFlag("interval", cmd.PersistentFlags().Lookup("interval"))
-			viper.BindPFlag("sla_metrics", cmd.PersistentFlags().Lookup("sla_metrics"))
-			viper.BindPFlag("latency_percentiles", cmd.PersistentFlags().Lookup("latency_percentiles"))
-
-			// Load configuration (config file takes precedence if it exists)
+			// Load configuration from file/env variables.
 			cfg, err := config.LoadConfig(cfgFile)
 			if err != nil {
 				fmt.Printf("Error loading config: %v\n", err)
 				os.Exit(1)
+			}
+
+			// Override with CLI flags if provided.
+			if cmd.Flags().Changed("target") {
+				cfg.Target = target
+			}
+			if cmd.Flags().Changed("concurrency") {
+				cfg.Concurrency = concurrency
+			}
+			if cmd.Flags().Changed("interval") {
+				if d, err := time.ParseDuration(interval); err == nil {
+					cfg.Interval = d
+				} else {
+					fmt.Printf("Invalid interval: %v\n", err)
+					os.Exit(1)
+				}
+			}
+			if cmd.Flags().Changed("sla_metrics") {
+				cfg.SLAMetrics = slaMetrics
+			}
+			if cmd.Flags().Changed("latency_percentiles") {
+				cfg.LatencyPercentiles = latencyPercentiles
 			}
 
 			// Create and start the monitor.
@@ -63,7 +79,7 @@ func main() {
 	}
 
 	// Flags for configuration.
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "configs/config.yaml", "Path to config file")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "Path to config file (optional)")
 	rootCmd.PersistentFlags().StringVar(&target, "target", "", "Target endpoint")
 	rootCmd.PersistentFlags().IntVar(&concurrency, "concurrency", 0, "Number of concurrent requests")
 	rootCmd.PersistentFlags().StringVar(&interval, "interval", "", "Interval duration between requests (e.g., '5s', '1m')")
