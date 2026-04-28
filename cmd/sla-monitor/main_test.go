@@ -15,13 +15,17 @@ import (
 )
 
 type fakeMonitor struct {
-	started bool
-	stopped bool
-	data    monitor.ReportData
+	started   bool
+	stopped   bool
+	startedCh chan struct{}
+	data      monitor.ReportData
 }
 
 func (m *fakeMonitor) Start() {
 	m.started = true
+	if m.startedCh != nil {
+		close(m.startedCh)
+	}
 }
 
 func (m *fakeMonitor) Stop() {
@@ -112,7 +116,10 @@ func executeCommand(t *testing.T, args []string) (string, string, *fakeMonitor) 
 			{Percentile: 50, Value: 30 * time.Millisecond},
 		},
 	}
-	fake := &fakeMonitor{data: data}
+	fake := &fakeMonitor{
+		startedCh: make(chan struct{}),
+		data:      data,
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd := newRootCommand(&stdout, &stderr, func(cfg *config.Config, status io.Writer) appMonitor {
@@ -120,7 +127,10 @@ func executeCommand(t *testing.T, args []string) (string, string, *fakeMonitor) 
 			t.Fatalf("unexpected config target: %s", cfg.Target)
 		}
 		return fake
-	}, func() os.Signal { return nil })
+	}, func() os.Signal {
+		<-fake.startedCh
+		return nil
+	})
 	cmd.SetArgs(append([]string{"--config", cfgFile}, args...))
 
 	if err := cmd.Execute(); err != nil {
