@@ -57,6 +57,12 @@ func TestRootCommandRejectsInvalidOutputBeforeMonitoringStarts(t *testing.T) {
 	if started {
 		t.Fatal("monitor started for invalid output")
 	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no report on stdout, got:\n%s", stdout.String())
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("expected no status output on stderr, got:\n%s", stderr.String())
+	}
 }
 
 func TestRootCommandDefaultOutputWritesTextReportToStdoutAndStatusToStderr(t *testing.T) {
