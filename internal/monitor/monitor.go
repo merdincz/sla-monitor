@@ -110,31 +110,6 @@ func (m *Monitor) Stop() {
 	close(m.stopCh)
 }
 
-func (m *Monitor) Report() {
-	data := m.ReportData()
-
-	fmt.Printf("SLA Report (%s to %s)\n", data.StartTime.Format("2006-01-02 15:04:05"), data.EndTime.Format("2006-01-02 15:04:05"))
-	fmt.Println("--------------------------------------------------------")
-	fmt.Printf("Total Requests: %d\n", data.TotalRequests)
-	fmt.Printf("Successful: %d\n", data.SuccessfulRequests)
-	fmt.Printf("Failed: %d\n", data.FailedRequests)
-
-	if contains(data.SLAMetrics, "uptime") && data.TotalRequests > 0 {
-		fmt.Printf("Uptime: %.2f%% (%d/%d successful requests)\n", data.Uptime, data.SuccessfulRequests, data.TotalRequests)
-	}
-
-	if contains(data.SLAMetrics, "error_rate") && data.TotalRequests > 0 {
-		fmt.Printf("Error Rate: %.2f%% (%d/%d failed requests)\n", data.ErrorRate, data.FailedRequests, data.TotalRequests)
-	}
-
-	if contains(data.SLAMetrics, "latency") && len(data.LatencyMetrics) > 0 {
-		fmt.Println("Latency Metrics")
-		for _, metric := range data.LatencyMetrics {
-			fmt.Printf("\tp%d: %v\n", metric.Percentile, metric.Value)
-		}
-	}
-}
-
 func (m *Monitor) ReportData() ReportData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
