@@ -47,14 +47,15 @@ sla-monitor \
 --interval: Interval between requests (e.g., "5s", "1m")
 --sla_metrics: Metrics to monitor (uptime, latency, error_rate)
 --latency_percentiles: Latency percentiles to report
+--output: Output format for the final report: text or html (default: "text")
 ```
 
 ## Example Output
-```bash
-Target: https://api.example.com
-Concurrency: 10
-Interval: 1s
+The final report is written to stdout. Operational messages such as target,
+concurrency, startup, shutdown, config load errors, and command errors are
+written to stderr. This keeps redirected reports clean.
 
+```bash
 SLA Report (2024-03-15 10:00:00 to 2024-03-15 10:01:00)
 --------------------------------------------------------
 Total Requests: 600
@@ -67,3 +68,24 @@ Latency Metrics
     p95: 250ms
     p99: 350ms
 ```
+
+To explicitly render the default text report:
+
+```bash
+sla-monitor --config config.yaml --output text
+```
+
+To render a standalone HTML report:
+
+```bash
+sla-monitor --config config.yaml --output html
+```
+
+To save a clean HTML report with shell redirection:
+
+```bash
+sla-monitor --config config.yaml --output html > report.html
+```
+
+An `--output-file` option is not currently supported; use stdout redirection
+when you need to write the report to a file.
