@@ -47,10 +47,7 @@ func newRootCommand(out, errOut io.Writer, newMonitor monitorFactory, wait signa
 		Short:   "SLA Monitor is a CLI tool to monitor service level agreements",
 		Example: `sla-monitor --target http://localhost:8080 --concurrency 10 --interval 5s --sla_metrics uptime,latency,error_rate --latency_percentiles 50,95,99 --output text`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if output != "text" && output != "html" {
-				return fmt.Errorf("invalid output %q: supported values are text and html", output)
-			}
-			return nil
+			return validateOutputFormat(output)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := bindFlags(cmd); err != nil {
@@ -115,12 +112,22 @@ func waitForSignal() os.Signal {
 }
 
 func renderReport(w io.Writer, output string, data monitor.ReportData) error {
+	if err := validateOutputFormat(output); err != nil {
+		return err
+	}
+
 	switch output {
 	case "text":
 		return report.RenderText(w, data)
 	case "html":
 		return report.RenderHTML(w, data)
-	default:
+	}
+	return nil
+}
+
+func validateOutputFormat(output string) error {
+	if output != "text" && output != "html" {
 		return fmt.Errorf("invalid output %q: supported values are text and html", output)
 	}
+	return nil
 }
