@@ -3,11 +3,13 @@ package monitor
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"sla-monitor/internal/config"
+	"sla-monitor/internal/report"
 )
 
 type Monitor struct {
@@ -24,13 +26,24 @@ type Monitor struct {
 	endTime         time.Time
 	latencies       []time.Duration
 	mu              sync.Mutex
+	reporters       []report.Reporter
 }
 
 func NewMonitor(cfg *config.Config) *Monitor {
+	outputDir := cfg.OutputDir
+	if outputDir == "" {
+		outputDir = "."
+	}
+	outputName := cfg.OutputName
+	if outputName == "" {
+		outputName = "sla-report"
+	}
+
 	return &Monitor{
-		cfg:    cfg,
-		client: &http.Client{},
-		stopCh: make(chan struct{}),
+		cfg:       cfg,
+		client:    &http.Client{},
+		stopCh:    make(chan struct{}),
+		reporters: report.NewReporters(cfg.Output, outputDir, outputName, os.Stdout),
 	}
 }
 
@@ -88,39 +101,52 @@ func (m *Monitor) Report() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	fmt.Printf("SLA Report (%s to %s)\n", m.startTime.Format("2006-01-02 15:04:05"), m.endTime.Format("2006-01-02 15:04:05"))
-	fmt.Println("--------------------------------------------------------")
-	fmt.Printf("Total Requests: %d\n", m.TotalRequests)
-	fmt.Printf("Successful: %d\n", m.SuccessRequests)
-	fmt.Printf("Failed: %d\n", m.failedRequests)
+	data := m.reportData()
+	for _, reporter := range m.reporters {
+		if err := reporter.Report(data); err != nil {
+			fmt.Fprintf(os.Stderr, "report generation failed: %v\n", err)
+		}
+	}
+}
 
-	// Uptime
-	if contains(m.cfg.SLAMetrics, "uptime") && m.TotalRequests > 0 {
-		uptime := float64(m.SuccessRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Uptime: %.2f%% (%d/%d successful requests)\n", uptime, m.SuccessRequests, m.TotalRequests)
+func (m *Monitor) reportData() report.ReportData {
+	data := report.ReportData{
+		StartTime:          m.startTime,
+		EndTime:            m.endTime,
+		TotalRequests:      m.TotalRequests,
+		SuccessfulRequests: m.SuccessRequests,
+		FailedRequests:     m.failedRequests,
 	}
 
-	// Error rate
-	if contains(m.cfg.SLAMetrics, "error_rate") && m.TotalRequests > 0 {
-		errorRate := float64(m.failedRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Error Rate: %.2f%% (%d/%d failed requests)\n", errorRate, m.failedRequests, m.TotalRequests)
+	if m.TotalRequests > 0 {
+		if contains(m.cfg.SLAMetrics, "uptime") {
+			uptime := float64(m.SuccessRequests) / float64(m.TotalRequests) * 100
+			data.Uptime = &uptime
+		}
+		if contains(m.cfg.SLAMetrics, "error_rate") {
+			errorRate := float64(m.failedRequests) / float64(m.TotalRequests) * 100
+			data.ErrorRate = &errorRate
+		}
 	}
 
-	// Latency
 	if contains(m.cfg.SLAMetrics, "latency") && len(m.latencies) > 0 {
 		sorted := make([]time.Duration, len(m.latencies))
 		copy(sorted, m.latencies)
 		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 
-		fmt.Println("Latency Metrics")
 		for _, perc := range m.cfg.LatencyPercentiles {
 			index := (perc * len(sorted)) / 100
 			if index >= len(sorted) {
 				index = len(sorted) - 1
 			}
-			fmt.Printf("\tp%d: %v\n", perc, sorted[index])
+			data.Latency = append(data.Latency, report.LatencyMetric{
+				Percentile: perc,
+				Duration:   sorted[index],
+			})
 		}
 	}
+
+	return data
 }
 
 func contains(slice []string, item string) bool {

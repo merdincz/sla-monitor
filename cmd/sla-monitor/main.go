@@ -20,6 +20,9 @@ var (
 	interval           string
 	slaMetrics         []string
 	latencyPercentiles []int
+	outputs            []string
+	outputDir          string
+	outputName         string
 )
 
 func main() {
@@ -34,6 +37,9 @@ func main() {
 			viper.BindPFlag("interval", cmd.PersistentFlags().Lookup("interval"))
 			viper.BindPFlag("sla_metrics", cmd.PersistentFlags().Lookup("sla_metrics"))
 			viper.BindPFlag("latency_percentiles", cmd.PersistentFlags().Lookup("latency_percentiles"))
+			viper.BindPFlag("output", cmd.PersistentFlags().Lookup("output"))
+			viper.BindPFlag("output_dir", cmd.PersistentFlags().Lookup("output-dir"))
+			viper.BindPFlag("output_name", cmd.PersistentFlags().Lookup("output-name"))
 
 			// Load configuration (config file takes precedence if it exists)
 			cfg, err := config.LoadConfig(cfgFile)
@@ -69,6 +75,9 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&interval, "interval", "", "Interval duration between requests (e.g., '5s', '1m')")
 	rootCmd.PersistentFlags().StringSliceVar(&slaMetrics, "sla_metrics", nil, "SLA metrics to monitor (e.g., uptime,latency,error_rate)")
 	rootCmd.PersistentFlags().IntSliceVar(&latencyPercentiles, "latency_percentiles", nil, "Latency percentiles (e.g., 50,95,99)")
+	rootCmd.PersistentFlags().StringSliceVar(&outputs, "output", nil, "Additional output formats (comma-separated): html,csv,md,pdf")
+	rootCmd.PersistentFlags().StringVar(&outputDir, "output-dir", ".", "Directory where report files are written")
+	rootCmd.PersistentFlags().StringVar(&outputName, "output-name", "sla-report", "Base filename for generated reports")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
