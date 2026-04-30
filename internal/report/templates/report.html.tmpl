@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SLA Report</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; padding: 2rem; font-family: "Segoe UI", Tahoma, sans-serif; background: linear-gradient(180deg,#eef4ff 0%,#f6fbff 100%); color:#0f172a; }
+    .card { max-width: 960px; margin: 0 auto; background:#fff; border-radius:16px; box-shadow:0 16px 40px rgba(15,23,42,.15); overflow:hidden; }
+    .header { padding: 1.5rem 2rem; background: linear-gradient(120deg,#0f766e,#0ea5e9); color:#fff; }
+    h1 { margin: 0 0 .4rem; font-size: 1.8rem; }
+    .meta { opacity: .95; font-size: .95rem; }
+    .content { padding: 1.5rem 2rem 2rem; }
+    table { width:100%; border-collapse: collapse; border-radius:12px; overflow:hidden; }
+    thead th { text-align:left; background:#0f172a; color:#fff; font-weight:600; padding:.75rem; font-size:.95rem; }
+    tbody td { padding:.75rem; border-bottom:1px solid #e2e8f0; }
+    tbody tr:nth-child(even) { background:#f8fafc; }
+    .section { margin-top: 1.25rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>SLA Report</h1>
+      <div class="meta">{{ .StartTime.Format "2006-01-02 15:04:05" }} to {{ .EndTime.Format "2006-01-02 15:04:05" }}</div>
+    </div>
+    <div class="content">
+      <table>
+        <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Total Requests</td><td>{{ .TotalRequests }}</td></tr>
+          <tr><td>Successful</td><td>{{ .SuccessfulRequests }}</td></tr>
+          <tr><td>Failed</td><td>{{ .FailedRequests }}</td></tr>
+          {{ if .Uptime }}<tr><td>Uptime</td><td>{{ printf "%.2f%%" .Uptime }}</td></tr>{{ end }}
+          {{ if .ErrorRate }}<tr><td>Error Rate</td><td>{{ printf "%.2f%%" .ErrorRate }}</td></tr>{{ end }}
+        </tbody>
+      </table>
+
+      {{ if .Latency }}
+      <div class="section">
+        <table>
+          <thead><tr><th>Latency Percentile</th><th>Duration</th></tr></thead>
+          <tbody>
+            {{ range .Latency }}<tr><td>p{{ .Percentile }}</td><td>{{ .Duration }}</td></tr>{{ end }}
+          </tbody>
+        </table>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</body>
+</html>
