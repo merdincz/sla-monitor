@@ -48,3 +48,13 @@ latency_percentiles: [50, 90]
 		t.Errorf("expected interval 2s, got %v", cfg.Interval)
 	}
 }
+
+func TestLoadConfig_MissingFileIsAllowed(t *testing.T) {
+	cfg, err := config.LoadConfig("/tmp/does-not-exist-config.yaml")
+	if err != nil {
+		t.Fatalf("LoadConfig returned error for missing config file: %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("expected config struct, got nil")
+	}
+}

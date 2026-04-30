@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"os"
 	"time"
 
 	"github.com/spf13/viper"
@@ -23,7 +25,9 @@ func LoadConfig(cfgFile string) (*Config, error) {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+		var notFound viper.ConfigFileNotFoundError
+		if errors.As(err, &notFound) || errors.Is(err, os.ErrNotExist) {
+			// Missing config file is allowed. CLI flags/env can still provide values.
 		} else {
 			return nil, err
 		}
