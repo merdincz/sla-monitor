@@ -12,6 +12,9 @@ type Config struct {
 	Interval           time.Duration `mapstructure:"interval"`
 	SLAMetrics         []string      `mapstructure:"sla_metrics"`
 	LatencyPercentiles []int         `mapstructure:"latency_percentiles"`
+	Output             []string      `mapstructure:"output"`
+	OutputDir          string        `mapstructure:"output_dir"`
+	OutputName         string        `mapstructure:"output_name"`
 }
 
 // Use config file if it exists, otherwise use CLI flags/env variables.
