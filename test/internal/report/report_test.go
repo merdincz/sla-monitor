@@ -75,6 +75,30 @@ func TestValidateOutputConfig(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("html extension required", func(t *testing.T) {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "report.txt")
+		err := report.ValidateOutputConfig("html", file)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "requires --output-file extension .html,.htm") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("pdf extension required", func(t *testing.T) {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "report")
+		err := report.ValidateOutputConfig("pdf", file)
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "requires --output-file extension .pdf") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestOutputManagerWritesFiles(t *testing.T) {
