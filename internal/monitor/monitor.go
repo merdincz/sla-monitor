@@ -3,11 +3,12 @@ package monitor
 import (
 	"fmt"
 	"net/http"
-	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"sla-monitor/internal/config"
+	"sla-monitor/internal/report"
 )
 
 type Monitor struct {
@@ -84,43 +85,54 @@ func (m *Monitor) Stop() {
 	close(m.stopCh)
 }
 
-func (m *Monitor) Report() {
+func (m *Monitor) BuildReportData() report.ReportData {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	fmt.Printf("SLA Report (%s to %s)\n", m.startTime.Format("2006-01-02 15:04:05"), m.endTime.Format("2006-01-02 15:04:05"))
+	latCopy := make([]time.Duration, len(m.latencies))
+	copy(latCopy, m.latencies)
+
+	return report.BuildReportData(
+		m.startTime,
+		m.endTime,
+		m.TotalRequests,
+		m.SuccessRequests,
+		m.failedRequests,
+		latCopy,
+		m.cfg.SLAMetrics,
+		m.cfg.LatencyPercentiles,
+	)
+}
+
+func (m *Monitor) Report() {
+	data := m.BuildReportData()
+
+	fmt.Printf("SLA Report (%s to %s)\n", data.StartTime, data.EndTime)
 	fmt.Println("--------------------------------------------------------")
-	fmt.Printf("Total Requests: %d\n", m.TotalRequests)
-	fmt.Printf("Successful: %d\n", m.SuccessRequests)
-	fmt.Printf("Failed: %d\n", m.failedRequests)
-
-	// Uptime
-	if contains(m.cfg.SLAMetrics, "uptime") && m.TotalRequests > 0 {
-		uptime := float64(m.SuccessRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Uptime: %.2f%% (%d/%d successful requests)\n", uptime, m.SuccessRequests, m.TotalRequests)
+	for _, row := range data.Rows {
+		if strings.HasPrefix(row.Name, "p") {
+			continue
+		}
+		fmt.Printf("%s: %s\n", row.Name, row.Value)
 	}
 
-	// Error rate
-	if contains(m.cfg.SLAMetrics, "error_rate") && m.TotalRequests > 0 {
-		errorRate := float64(m.failedRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Error Rate: %.2f%% (%d/%d failed requests)\n", errorRate, m.failedRequests, m.TotalRequests)
-	}
-
-	// Latency
-	if contains(m.cfg.SLAMetrics, "latency") && len(m.latencies) > 0 {
-		sorted := make([]time.Duration, len(m.latencies))
-		copy(sorted, m.latencies)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-
-		fmt.Println("Latency Metrics")
-		for _, perc := range m.cfg.LatencyPercentiles {
-			index := (perc * len(sorted)) / 100
-			if index >= len(sorted) {
-				index = len(sorted) - 1
+	if contains(m.cfg.SLAMetrics, "latency") {
+		hasLatency := false
+		for _, row := range data.Rows {
+			if strings.HasPrefix(row.Name, "p") {
+				if !hasLatency {
+					fmt.Println("Latency Metrics")
+					hasLatency = true
+				}
+				fmt.Printf("\t%s: %s\n", row.Name, row.Value)
 			}
-			fmt.Printf("\tp%d: %v\n", perc, sorted[index])
 		}
 	}
+}
+
+func (m *Monitor) ReportV2(format, outputFile string) error {
+	manager := report.NewOutputManager()
+	return manager.Emit(format, outputFile, m.BuildReportData())
 }
 
 func contains(slice []string, item string) bool {
