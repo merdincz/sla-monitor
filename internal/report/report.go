@@ -82,6 +82,9 @@ func ValidateOutputConfig(formatRaw, outputFile string) error {
 	if strings.TrimSpace(outputFile) == "" {
 		return fmt.Errorf("--output-file is required when --output=%s", format)
 	}
+	if err := validateOutputExtension(format, outputFile); err != nil {
+		return err
+	}
 
 	dir := filepath.Dir(outputFile)
 	if _, err := os.Stat(dir); err != nil {
@@ -105,6 +108,38 @@ func ValidateOutputConfig(formatRaw, outputFile string) error {
 	}
 
 	return nil
+}
+
+func validateOutputExtension(format OutputFormat, outputFile string) error {
+	ext := strings.ToLower(filepath.Ext(outputFile))
+	allowedByFormat := map[OutputFormat]map[string]struct{}{
+		OutputCSV:  {".csv": {}},
+		OutputMD:   {".md": {}, ".markdown": {}},
+		OutputHTML: {".html": {}, ".htm": {}},
+		OutputPDF:  {".pdf": {}},
+	}
+	allowed := allowedByFormat[format]
+	if _, ok := allowed[ext]; ok {
+		return nil
+	}
+
+	var allowedList string
+	switch format {
+	case OutputCSV:
+		allowedList = ".csv"
+	case OutputMD:
+		allowedList = ".md,.markdown"
+	case OutputHTML:
+		allowedList = ".html,.htm"
+	case OutputPDF:
+		allowedList = ".pdf"
+	default:
+		return nil
+	}
+	if ext == "" {
+		return fmt.Errorf("--output=%s requires --output-file extension %s", format, allowedList)
+	}
+	return fmt.Errorf("--output=%s requires --output-file extension %s (got %s)", format, allowedList, ext)
 }
 
 func (m *OutputManager) Emit(formatRaw string, outputFile string, data ReportData) error {
