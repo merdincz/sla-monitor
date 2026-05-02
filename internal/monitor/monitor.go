@@ -2,19 +2,22 @@ package monitor
 
 import (
 	"fmt"
+	"io"
 	"net/http"
-	"sort"
+	"os"
 	"sync"
 	"time"
 
 	"sla-monitor/internal/config"
+	"sla-monitor/internal/report"
 )
 
 type Monitor struct {
-	cfg    *config.Config
-	client *http.Client
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	cfg       *config.Config
+	client    *http.Client
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
+	logWriter io.Writer
 
 	// Metrics
 	TotalRequests   int
@@ -28,18 +31,29 @@ type Monitor struct {
 
 func NewMonitor(cfg *config.Config) *Monitor {
 	return &Monitor{
-		cfg:    cfg,
-		client: &http.Client{},
-		stopCh: make(chan struct{}),
+		cfg:       cfg,
+		client:    &http.Client{Timeout: 30 * time.Second},
+		stopCh:    make(chan struct{}),
+		logWriter: os.Stdout,
 	}
+}
+
+func (m *Monitor) SetLogWriter(w io.Writer) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if w == nil {
+		m.logWriter = io.Discard
+		return
+	}
+	m.logWriter = w
 }
 
 func (m *Monitor) Start() {
 	m.startTime = time.Now()
 	ticker := time.NewTicker(m.cfg.Interval)
 	defer ticker.Stop()
-	fmt.Printf("Monitoring going to start based on your frequency...\n")
-	fmt.Printf("Waiting for close signal... (Command/Ctrl + C)\n")
+	fmt.Fprintln(m.logWriter, "Monitoring going to start based on your frequency...")
+	fmt.Fprintln(m.logWriter, "Waiting for close signal... (Command/Ctrl + C)")
 	for {
 		select {
 		case <-ticker.C:
@@ -58,7 +72,6 @@ func (m *Monitor) doRequest() {
 	defer m.wg.Done()
 
 	start := time.Now()
-	m.client.Timeout = 30 * time.Second
 	resp, err := m.client.Get(m.cfg.Target)
 	duration := time.Since(start)
 
@@ -85,49 +98,42 @@ func (m *Monitor) Stop() {
 }
 
 func (m *Monitor) Report() {
+	_ = report.RenderText(os.Stdout, m.Snapshot())
+}
+
+func (m *Monitor) Snapshot() report.Snapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	fmt.Printf("SLA Report (%s to %s)\n", m.startTime.Format("2006-01-02 15:04:05"), m.endTime.Format("2006-01-02 15:04:05"))
-	fmt.Println("--------------------------------------------------------")
-	fmt.Printf("Total Requests: %d\n", m.TotalRequests)
-	fmt.Printf("Successful: %d\n", m.SuccessRequests)
-	fmt.Printf("Failed: %d\n", m.failedRequests)
+	latencies := make([]time.Duration, len(m.latencies))
+	copy(latencies, m.latencies)
 
-	// Uptime
-	if contains(m.cfg.SLAMetrics, "uptime") && m.TotalRequests > 0 {
-		uptime := float64(m.SuccessRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Uptime: %.2f%% (%d/%d successful requests)\n", uptime, m.SuccessRequests, m.TotalRequests)
-	}
-
-	// Error rate
-	if contains(m.cfg.SLAMetrics, "error_rate") && m.TotalRequests > 0 {
-		errorRate := float64(m.failedRequests) / float64(m.TotalRequests) * 100
-		fmt.Printf("Error Rate: %.2f%% (%d/%d failed requests)\n", errorRate, m.failedRequests, m.TotalRequests)
-	}
-
-	// Latency
-	if contains(m.cfg.SLAMetrics, "latency") && len(m.latencies) > 0 {
-		sorted := make([]time.Duration, len(m.latencies))
-		copy(sorted, m.latencies)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
-
-		fmt.Println("Latency Metrics")
-		for _, perc := range m.cfg.LatencyPercentiles {
-			index := (perc * len(sorted)) / 100
-			if index >= len(sorted) {
-				index = len(sorted) - 1
-			}
-			fmt.Printf("\tp%d: %v\n", perc, sorted[index])
-		}
-	}
+	return report.NewSnapshot(report.BuilderInput{
+		Target:             m.cfg.Target,
+		Concurrency:        m.cfg.Concurrency,
+		Interval:           m.cfg.Interval,
+		SLAMetrics:         m.cfg.SLAMetrics,
+		LatencyPercentiles: m.cfg.LatencyPercentiles,
+		StartTime:          m.startTime,
+		EndTime:            m.endTime,
+		TotalRequests:      m.TotalRequests,
+		SuccessRequests:    m.SuccessRequests,
+		FailedRequests:     m.failedRequests,
+		Latencies:          latencies,
+	})
 }
 
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
+func (m *Monitor) FailedRequests() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.failedRequests
+}
+
+func (m *Monitor) LogWriter() io.Writer {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.logWriter == nil {
+		return io.Discard
 	}
-	return false
+	return m.logWriter
 }
